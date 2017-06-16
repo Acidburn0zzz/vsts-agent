@@ -169,6 +169,15 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener
             }
             else
             {
+                if (e is ConsoleCancelEventArgs)
+                {
+                    if ((e as ConsoleCancelEventArgs).SpecialKey == ConsoleSpecialKey.ControlBreak)
+                    {
+                        Trace.Info("Shutting down.");
+                        HostContext.SystemShutdown = true;
+                    }
+                }
+
                 TokenSource.Cancel();
             }
         }

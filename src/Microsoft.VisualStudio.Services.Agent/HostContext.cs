@@ -24,6 +24,7 @@ namespace Microsoft.VisualStudio.Services.Agent
         T GetService<T>() where T : class, IAgentService;
         void SetDefaultCulture(string name);
         event EventHandler Unloading;
+        bool SystemShutdown { get; set; }
     }
 
     public sealed class HostContext : EventListener, IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object>>, IHostContext, IDisposable
@@ -43,6 +44,7 @@ namespace Microsoft.VisualStudio.Services.Agent
         private IDisposable _diagListenerSubscription;
 
         public event EventHandler Unloading;
+        public bool SystemShutdown { get; set; }
 
         public HostContext(string hostType, string logFile = null)
         {

@@ -16,7 +16,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
     [ServiceLocator(Default = typeof(JobRunner))]
     public interface IJobRunner : IAgentService
     {
-        Task<TaskResult> RunAsync(AgentJobRequestMessage message, CancellationToken jobRequestCancellationToken);
+        Task<TaskResult> RunAsync(AgentJobRequestMessage message, CancellationToken jobRequestCancellationToken, CancellationToken systemShutdownCancellationToken);
     }
 
     public sealed class JobRunner : AgentService, IJobRunner
@@ -24,7 +24,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
         private IJobServerQueue _jobServerQueue;
         private ITempDirectoryManager _tempDirectoryManager;
 
-        public async Task<TaskResult> RunAsync(AgentJobRequestMessage message, CancellationToken jobRequestCancellationToken)
+        public async Task<TaskResult> RunAsync(AgentJobRequestMessage message, CancellationToken jobRequestCancellationToken, CancellationToken systemShutdownCancellationToken)
         {
             // Validate parameters.
             Trace.Entering();
@@ -59,6 +59,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
             _jobServerQueue.Start(message);
 
             IExecutionContext jobContext = null;
+            CancellationTokenRegistration? systemShutdownRegistration = null;
             try
             {
                 // Create the job execution context.
@@ -67,6 +68,14 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
                 Trace.Info("Starting the job execution context.");
                 jobContext.Start();
                 jobContext.Section(StringUtil.Loc("StepStarting", message.JobName));
+
+                systemShutdownRegistration = systemShutdownCancellationToken.Register(async () =>
+                {
+                    Trace.Info("Shutting down.");
+                    jobContext.AddIssue(new Issue() { Type = IssueType.Error, Message = "System has been shutting down." });
+                    await CompleteJobAsync(jobServer, jobContext, message, TaskResult.Canceled);
+                    Trace.Info("Shutted down.");
+                });
 
                 // Set agent version variable.
                 jobContext.Variables.Set(Constants.Variables.Agent.Version, Constants.Agent.Version);
@@ -284,6 +293,12 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
             }
             finally
             {
+                if (systemShutdownRegistration != null)
+                {
+                    systemShutdownRegistration.Value.Dispose();
+                    systemShutdownRegistration = null;
+                }
+
                 await ShutdownQueue(throwOnFailure: false);
             }
         }

@@ -31,6 +31,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
 
             using (var channel = HostContext.CreateService<IProcessChannel>())
             using (var jobRequestCancellationToken = new CancellationTokenSource())
+            using (var systemShutdownCancellationToken = new CancellationTokenSource())
             using (var channelTokenSource = new CancellationTokenSource())
             {
                 // Start the channel.
@@ -57,7 +58,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
 
                 // Start the job.
                 Trace.Info($"Job message:{Environment.NewLine} {StringUtil.ConvertToJson(jobMessage)}");
-                Task<TaskResult> jobRunnerTask = jobRunner.RunAsync(jobMessage, jobRequestCancellationToken.Token);
+                Task<TaskResult> jobRunnerTask = jobRunner.RunAsync(jobMessage, jobRequestCancellationToken.Token, systemShutdownCancellationToken.Token);
 
                 // Start listening for a cancel message from the channel.
                 Trace.Info("Listening for cancel message from the channel.");
@@ -78,8 +79,20 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
                 // Otherwise a cancel message was received from the channel.
                 Trace.Info("Cancellation message received.");
                 channelMessage = await channelTask;
-                ArgUtil.Equal(MessageType.CancelRequest, channelMessage.MessageType, nameof(channelMessage.MessageType));
-                jobRequestCancellationToken.Cancel();   // Expire the host cancellation token.
+                switch (channelMessage.MessageType)
+                {
+                    case MessageType.CancelRequest:
+                        jobRequestCancellationToken.Cancel();   // Expire the host cancellation token.
+                        break;
+                    case MessageType.SystemShutdownRequest:
+                        Trace.Info("Shutting down.");
+                        HostContext.SystemShutdown = true;
+                        systemShutdownCancellationToken.Cancel();
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(channelMessage.MessageType), channelMessage.MessageType, nameof(channelMessage.MessageType));
+                }
+
                 // Await the job.
                 return TaskResultUtil.TranslateToReturnCode(await jobRunnerTask);
             }

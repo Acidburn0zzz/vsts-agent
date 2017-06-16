@@ -469,8 +469,9 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener
                             Trace.Info($"Send job cancellation message to worker for job {message.JobId}.");
                             using (var csSendCancel = new CancellationTokenSource(_channelTimeout))
                             {
+                                var messageType = HostContext.SystemShutdown ? MessageType.SystemShutdownRequest : MessageType.CancelRequest;
                                 await processChannel.SendAsync(
-                                    messageType: MessageType.CancelRequest,
+                                    messageType: messageType,
                                     body: string.Empty,
                                     cancellationToken: csSendCancel.Token);
                             }

@@ -12,7 +12,8 @@ namespace Microsoft.VisualStudio.Services.Agent
     {
         NotInitialized = -1,
         NewJobRequest = 1,
-        CancelRequest = 2
+        CancelRequest = 2,
+        SystemShutdownRequest = 3
     }
 
     public struct WorkerMessage

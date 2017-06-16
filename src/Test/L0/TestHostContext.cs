@@ -25,7 +25,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests
         private AssemblyLoadContext _loadContext;
         private List<string> _tempDirectorys = new List<string>();
         public event EventHandler Unloading;
-
+        public bool SystemShutdown { get; set; }
         public TestHostContext(object testClass, [CallerMemberName] string testName = "")
         {
             ArgUtil.NotNull(testClass, nameof(testClass));

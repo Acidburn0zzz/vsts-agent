@@ -15,6 +15,7 @@ namespace AgentService
     {
         public const string EventSourceName = "VstsAgentService";
         private const int CTRL_C_EVENT = 0;
+        private const int CTRL_BREAK_EVENT = 1;
         private bool _restart = false;
         private Process AgentListener { get; set; }
         private bool Stopping { get; set; }
@@ -158,6 +159,52 @@ namespace AgentService
             newProcess.StartInfo.RedirectStandardOutput = true;
             newProcess.StartInfo.RedirectStandardError = true;
             return newProcess;
+        }
+
+        protected override void OnShutdown()
+        {
+            try
+            {
+                if (AgentListener != null && !AgentListener.HasExited)
+                {
+                    // Try to let the agent process know that we are stopping
+                    //Attach service process to console of Agent.Listener process. This is needed,
+                    //because windows service doesn't use its own console.
+                    if (AttachConsole((uint)AgentListener.Id))
+                    {
+                        //Prevent main service process from stopping because of Ctrl + C event with SetConsoleCtrlHandler
+                        SetConsoleCtrlHandler(null, true);
+                        try
+                        {
+                            //Generate console event for current console with GenerateConsoleCtrlEvent (processGroupId should be zero)
+                            GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
+                            //Wait for the process to finish (give it up to 30 seconds)
+                            AgentListener.WaitForExit(10000);
+                        }
+                        finally
+                        {
+                            //Disconnect from console and restore Ctrl+C handling by main process
+                            FreeConsole();
+                            SetConsoleCtrlHandler(null, false);
+                        }
+                    }
+
+                    // if agent is still running, kill it
+                    if (!AgentListener.HasExited)
+                    {
+                        AgentListener.Kill();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                // InvalidOperationException is thrown when there is no process associated to the process object. 
+                // There is no process to kill, Log the exception and shutdown the service. 
+                // If we don't handle this here, the service get into a state where it can neither be stoped nor restarted (Error 1061)
+                WriteException(exception);
+            }
+
+            base.OnShutdown();
         }
 
         protected override void OnStop()
