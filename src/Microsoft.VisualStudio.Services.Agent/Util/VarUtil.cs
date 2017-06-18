@@ -15,7 +15,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Util
 
     public sealed class VarUtil : AgentService, IVarUtil
     {
-        public StringComparer EnvironmentVariableKeyComparer
+        public static StringComparer EnvironmentVariableKeyComparer
         {
             get
             {

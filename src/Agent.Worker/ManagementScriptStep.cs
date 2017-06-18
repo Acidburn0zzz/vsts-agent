@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.TeamFoundation.DistributedTask.Orchestration.Server.Expressions;
+using Microsoft.TeamFoundation.DistributedTask.WebApi;
 using Microsoft.VisualStudio.Services.Agent.Util;
 using Microsoft.VisualStudio.Services.Agent.Worker.Handlers;
 
@@ -53,8 +54,10 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
             var handler = (PowerShellExeHandler)handlerFactory.Create(
                 ExecutionContext,
                 ExecutionContext.Endpoints,
+                new List<SecureFile>(0),
                 handlerData,
-                new Dictionary<string, string>(),
+                inputs: new Dictionary<string, string>(),
+                environment: new Dictionary<string, string>(VarUtil.EnvironmentVariableKeyComparer),
                 taskDirectory: scriptDirectory,
                 filePathInputRootDirectory: string.Empty);
 
