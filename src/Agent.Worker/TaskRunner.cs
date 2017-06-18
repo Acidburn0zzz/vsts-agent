@@ -135,6 +135,23 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
                 }
             }
 
+            // Load the task environment.
+            Trace.Verbose("Loading task environment.");
+            var environment = new Dictionary<string, string>(VarUtil.EnvironmentVariableKeyComparer);
+            foreach (var env in (TaskInstance.Environment ?? new Dictionary<string, string>(0)))
+            {
+                string key = env.Key?.Trim() ?? string.Empty;
+                if (!string.IsNullOrEmpty(key))
+                {
+                    environment[key] = env.Value?.Trim() ?? string.Empty;
+                }
+            }
+
+            // Expand the inputs.
+            Trace.Verbose("Expanding task environment.");
+            ExecutionContext.Variables.ExpandValues(target: environment);
+            VarUtil.ExpandEnvironmentVariables(HostContext, target: environment);
+
             // Expand the handler inputs.
             Trace.Verbose("Expanding handler inputs.");
             VarUtil.ExpandValues(HostContext, source: inputs, target: handlerData.Inputs);
@@ -182,7 +199,37 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
                 }
             }
 
-            // TODO: Add secure file only referenced by the task.
+            // Get each secure file ID referenced by the task.
+            var secureFileIds = new List<Guid>();
+            foreach (var input in definition.Data?.Inputs ?? new TaskInputDefinition[0])
+            {
+                if (string.Equals(input.InputType ?? string.Empty, "secureFile", StringComparison.OrdinalIgnoreCase))
+                {
+                    string inputKey = input?.Name?.Trim() ?? string.Empty;
+                    string inputValue;
+                    if (!string.IsNullOrEmpty(inputKey) &&
+                        inputs.TryGetValue(inputKey, out inputValue) &&
+                        !string.IsNullOrEmpty(inputValue))
+                    {
+                        foreach (string rawId in inputValue.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            Guid parsedId;
+                            if (Guid.TryParse(rawId.Trim(), out parsedId) && parsedId != Guid.Empty)
+                            {
+                                secureFileIds.Add(parsedId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Get the endpoints referenced by the task.
+            var secureFiles = (ExecutionContext.SecureFiles ?? new List<SecureFile>(0))
+                .Join(inner: secureFileIds,
+                    outerKeySelector: (SecureFile secureFile) => secureFile.Id,
+                    innerKeySelector: (Guid secureFileId) => secureFileId,
+                    resultSelector: (SecureFile secureFile, Guid secureFileId) => secureFile)
+                .ToList();
 
             // Set output variables.
             foreach (var outputVar in definition.Data?.OutputVariables ?? new OutputVariable[0])
@@ -197,8 +244,10 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
             IHandler handler = handlerFactory.Create(
                 ExecutionContext,
                 endpoints,
+                secureFiles,
                 handlerData,
                 inputs,
+                environment,
                 taskDirectory: definition.Directory,
                 filePathInputRootDirectory: TranslateFilePathInput(string.Empty));
 

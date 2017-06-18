@@ -11,8 +11,10 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Handlers
         IHandler Create(
             IExecutionContext executionContext,
             List<ServiceEndpoint> endpoints,
+            List<SecureFile> secureFiles,
             HandlerData data,
             Dictionary<string, string> inputs,
+            Dictionary<string, string> environment,
             string taskDirectory,
             string filePathInputRootDirectory);
     }
@@ -22,8 +24,10 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Handlers
         public IHandler Create(
             IExecutionContext executionContext,
             List<ServiceEndpoint> endpoints,
+            List<SecureFile> secureFiles,
             HandlerData data,
             Dictionary<string, string> inputs,
+            Dictionary<string, string> environment,
             string taskDirectory,
             string filePathInputRootDirectory)
         {
@@ -31,8 +35,10 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Handlers
             Trace.Entering();
             ArgUtil.NotNull(executionContext, nameof(executionContext));
             ArgUtil.NotNull(endpoints, nameof(endpoints));
+            ArgUtil.NotNull(secureFiles, nameof(secureFiles));
             ArgUtil.NotNull(data, nameof(data));
             ArgUtil.NotNull(inputs, nameof(inputs));
+            ArgUtil.NotNull(environment, nameof(environment));
             ArgUtil.NotNull(taskDirectory, nameof(taskDirectory));
 
             // Create the handler.
@@ -80,9 +86,11 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Handlers
             }
 
             handler.Endpoints = endpoints;
+            handler.Environment = environment;
             handler.ExecutionContext = executionContext;
             handler.FilePathInputRootDirectory = filePathInputRootDirectory;
             handler.Inputs = inputs;
+            handler.SecureFiles = secureFiles;
             handler.TaskDirectory = taskDirectory;
             return handler;
         }
